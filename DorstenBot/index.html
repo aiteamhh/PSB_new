@@ -1,0 +1,46 @@
+﻿<html>
+	<head>	
+	    <title></title>
+		<meta charset="utf-8" />	
+		<link href="content/page/botchat.css" rel="stylesheet" />
+		<script src="scripts/md5.min.js"></script>
+		<style>
+			body {
+				font-family:'Segoe UI';
+				<!-- background-image: url('content/page/background.PNG'); -->
+				background-repeat: no-repeat;
+			}
+			
+			#botcontent {
+				margin-left: 40px;
+				margin-top: 40px;
+			}
+			
+			#bot {
+				width: 650px; 
+				height: 720px; 
+				margin-bottom: -5px;
+				position: relative !important; 
+				border: solid 2px #dfdfdf;
+			}
+		</style>
+	</head>
+	<body>			
+		<div id='botcontent'>	
+			<h3>Willkommen</h3>
+			<img src='content/page/avatar1.png' style='margin-top: 445px; margin-left:25px; position:absolute; opacity: 0.2' />
+			<div id='bot' />
+		</div>		
+			
+		<script src='content/page/botchat.js'></script>
+		<script>			
+			BotChat.App({
+				directLine: { secret: '' },
+				user: { id: 'userid' },
+				bot: { id: '' },
+				resize: 'detect' 
+			  }, document.getElementById('bot'));
+		</script>
+		<div style='margin-top: 800px' />
+	</body>
+</html>
