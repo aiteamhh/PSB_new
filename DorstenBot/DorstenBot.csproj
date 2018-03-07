@@ -104,7 +104,7 @@
     <Reference Include="System.Xml.Linq" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="default.htm" />
+    <Content Include="default.html" />
     <Content Include="Global.asax" />
     <Content Include="Web.config">
       <SubType>Designer</SubType>
@@ -112,12 +112,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="App_Start\WebApiConfig.cs" />
-    <Compile Include="Controllers\ActivityLogger.cs" />
     <Compile Include="Controllers\MessagesController.cs" />
-    <Compile Include="Dialogs\CitizenOfficeDialog.cs" />
-    <Compile Include="Dialogs\DisposalDialog.cs" />
-    <Compile Include="Dialogs\GreenPlacesDialog.cs" />
-    <Compile Include="Dialogs\Helper.cs" />
     <Compile Include="Dialogs\RootDialog.cs" />
     <Compile Include="Global.asax.cs">
       <DependentUpon>Global.asax</DependentUpon>

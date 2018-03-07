@@ -1,13 +1,12 @@
-﻿ using System.Net;
+﻿using System;
+using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
 using System.Web.Http;
 using Microsoft.Bot.Builder.Dialogs;
 using Microsoft.Bot.Connector;
-using System.IO;
-using System;
 
-namespace DottyBot
+namespace DorstenBot2
 {
     [BotAuthentication]
     public class MessagesController : ApiController
@@ -16,12 +15,11 @@ namespace DottyBot
         /// POST: api/Messages
         /// Receive a message from a user and reply to it
         /// </summary>
-
         public async Task<HttpResponseMessage> Post([FromBody]Activity activity)
         {
             if (activity.Type == ActivityTypes.Message)
             {
-                await Conversation.SendAsync(activity, () => new Dialogs.RootDialog());          
+                await Conversation.SendAsync(activity, () => new RootDialog());
             }
             else
             {
@@ -48,8 +46,8 @@ namespace DottyBot
                     foreach (var member in iConversationUpdated.MembersAdded ?? Array.Empty<ChannelAccount>())
                     {
                         if (member.Id == iConversationUpdated.Recipient.Id)
-                        {                           
-                            var reply = ((Activity)iConversationUpdated).CreateReply($"Hallo! \n\nWie kann ich behilflich sein? \n\n \n\nGeben Sie jederzeit 'Hilfe' ein, um weitere Hinweise zu bekommen.");
+                        {
+                            var reply = ((Activity)iConversationUpdated).CreateReply($"**Hallo und herzlich willkommen** beim digitalen Assistenten der Stadt Dorsten! \n\nBitte schreiben Sie mir eine Nachricht, um den Chat zu beginnen!");
                             connector.Conversations.ReplyToActivityAsync(reply);
                         }
                     }

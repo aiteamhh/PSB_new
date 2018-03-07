@@ -1,119 +1,180 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Net;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Microsoft.Bot.Builder.Dialogs;
-using System.Threading;
-using System.Net.Http;
-using Microsoft.Bot.Builder.Luis;
-using Microsoft.Bot.Builder.Luis.Models;
-using System.Collections.Generic;
+using Microsoft.Bot.Connector;
+using Newtonsoft.Json.Linq;
 
-namespace DottyBot.Dialogs
+namespace DorstenBot2
 {
-    [LuisModel("97e2e1f8-1191-4cc1-9271-43d71f29d447", "f02536e856a548f6a89fa27a7bafd5ec")]
     [Serializable]
-    public class RootDialog : LuisDialog<object>
+    public class RootDialog : IDialog<string>
     {
-        /*Main Choices*/
-        private const string choiceHelp = "Hilfe";
-        private const string choiceMenu = "Menü";
-        private const string choiceCitizenOffice = "Bürgerbüro";
-        private const string choiceGreenSpaces = "Grünanlagen";
-        private const string choiceDisposal = "Entsorgung";
-        private IEnumerable<string> mainChoices = new List<string> { choiceHelp, choiceMenu, choiceCitizenOffice, choiceGreenSpaces, choiceDisposal };
-
-        //https://westus.api.cognitive.microsoft.com/luis/v2.0/apps/97e2e1f8-1191-4cc1-9271-43d71f29d447?subscription-key=f02536e856a548f6a89fa27a7bafd5ec&verbose=true&timezoneOffset=60&q=
-
-        private const string HelpText = "Wähle zwischen den Kategorien\n\n- Bürgerbüro\n\n- Grünanlagen\n\n- Entsorgung\n\n, rufe \"Hilfe\" oder das \"Menü\" auf";
-
-
-        public virtual async Task ReturnDialog(IDialogContext context, IAwaitable<object> argument)
+        bool first = true;
+        bool wrong = false;
+        public async Task StartAsync(IDialogContext context)
         {
-			string value = String.Empty;
-            context.UserData.TryGetValue("nachfrage", out value);
-            context.UserData.SetValue("entity", "");
-			if (value != "ja")
+            await context.PostAsync("Willkommen. Wie kann ich behilflich sein?");
+            context.Wait(Step);
+        }
+
+        private async Task Step(IDialogContext context, IAwaitable<object> result)
+        {
+            if (first)
             {
-				await context.PostAsync("Kann ich dir noch mit etwas anderem Helfen?");
-				context.UserData.SetValue("nachfrage", "");
-			}
-            context.Wait(MessageReceived);
-        }
-
-        [LuisIntent("Hilfe")]
-        private async Task Hilfe(IDialogContext context, LuisResult result)
-        {
-            /*TODO: Einstellung keine Freitexteingabe*/
-            await context.PostAsync(HelpText);
-        }
-
-        [LuisIntent("Menu")]
-        private async Task Menu(IDialogContext context, LuisResult result)
-        {
-            PromptDialog.Choice(context, MenuChoiceMade, new string[] { choiceCitizenOffice, choiceGreenSpaces, choiceDisposal }, "Folgende Themen habe ich im Angebot");
-        }
-        private async Task MenuChoiceMade(IDialogContext context, IAwaitable<object> argument)
-        {
-            var choice = await argument;
-
-            switch (choice)
+                context.Wait(QuestionEntered);
+                first = false;
+            }
+            else if (!first && !wrong)
             {
-                case choiceCitizenOffice:
-                    context.Call(new CitizenOfficeDialog(), ReturnDialog);
-                    break;
-                case choiceGreenSpaces:
-                    context.Call(new GreenPlacesDialog(), ReturnDialog);
-                    break;
-                case choiceDisposal:
-                    context.Call(new DisposalDialog(), ReturnDialog);
-                    break;
+                await context.PostAsync("Wie darf ich noch weiterhelfen?");
+            }
+            if (wrong)
+            {
+                context.Wait(QuestionEntered);
+                wrong = false;
             }
         }
 
-        [LuisIntent("Hallo")]
-        private async Task Hallo(IDialogContext context, LuisResult result)
+
+        public async Task QuestionEntered(IDialogContext context, IAwaitable<object> argument)
         {
-            await context.PostAsync("Hallo! Wenn du wissen willst, was ich kann, versuch es mal mit \"Hilfe\"");
+            var activity = await argument as Activity;
+
+
+            // TODO call QnA
+            var answer = GetAnswerToQuestion(activity.Text);
+
+            if (answer[0].Answer.Contains("DoSomething"))
+            {
+                string buffer = answer[0].Answer;
+                buffer = buffer.Replace("DoSomething", "");
+
+                int last = 0;
+                int n = 0;
+                char[] a = answer[0].Answer.ToCharArray();
+                foreach (char c in a)
+                {
+                    if (c == ':')
+                    {
+                        last = n;
+                    }
+                    n++;
+                }
+
+                if (buffer.Contains("DoMap"))
+                {
+                    Regex r = new Regex(":");
+
+                    string[] parts = r.Split(buffer);
+
+                    var message = context.MakeMessage();
+                    var heroCard = new ThumbnailCard
+                    {
+                        Title = "Das Bürgerbüro finden Sie hier:",
+                        Subtitle = parts[parts.Length - 1],
+                        Buttons = new List<CardAction> { new CardAction(ActionTypes.OpenUrl, "Google Maps", value: "https://www.google.de/maps/place/Halterner+Str.+5,+46284+Dorsten/@51.6697362,6.9671216,17z/data=!3m1!4b1!4m5!3m4!1s0x47b8f18a59c0bd4b:0xd81648b42bd0495f!8m2!3d51.6697362!4d6.9693156") }
+                    };
+                    var attachment = heroCard.ToAttachment();
+                    message.Attachments.Add(attachment);
+                    await context.PostAsync(message);
+
+                }
+
+                PromptDialog.Confirm(context, QustionAnswered, "Ist Ihre Frage damit beantwortet?", options: new string[] { "Ja", "Nein" }, patterns: new string[][] { new string[] { "Yes", "ja", "Ja" }, new string[] { "No", "nein", "Nein" } });
+
+
+            }
+            else
+            {
+                if (answer[0].Score > 0.5)
+                {
+                    await context.PostAsync($"{answer[0].Answer}");
+
+                    PromptDialog.Confirm(context, QustionAnswered, "Ist Ihre Frage damit beantwortet?", options: new string[] { "Ja", "Nein" }, patterns: new string[][] { new string[] { "Yes", "ja", "Ja" }, new string[] { "No", "nein", "Nein" } });
+                }
+                else
+                {
+                    wrong = true;
+                    await context.PostAsync("Tut mir leid, das habe ich nicht richtig verstanden. Können Sie die Frage bitte anders formulieren?");
+                    Step(context, null);
+                }
+            }
+
+
         }
 
-        [LuisIntent("Wiedersehen")]
-        private async Task Wiedersehen(IDialogContext context, LuisResult result)
+        public virtual async Task QustionAnswered(IDialogContext context, IAwaitable<bool> argument)
         {
-            await context.PostAsync("Okay! Ich hoffe, ich konnte helfen. Bis zum nächsten Mal!");
+            var result = await argument;
+            if (result)
+                Step(context, null);
+            else
+            {
+                await context.PostAsync("Können Sie die Frage bitte anders formulieren?");
+                Step(context, null);
+            }
+        }
+
+        public virtual async Task RepeatQuestion(IDialogContext context, IAwaitable<bool> argument)
+        {
+            var result = await argument;
+            if (!result)
+            {
+                await context.PostAsync("Alles klar.");
+                context.Done("return");
+            }
+            else
+                PromptDialog.Text(context, QuestionEntered, "Welche Frage darf ich ich noch beantworten?");
+        }
+
+        public struct QnAObject
+        {
+            public string Answer;
+            public float Score;
+        }
+
+        public static List<QnAObject> GetAnswerToQuestion(string question)
+        {
+
+            var allAnswers = new List<JToken>();
+
+            string uriString = $"https://westus.api.cognitive.microsoft.com/qnamaker/v2.0/knowledgebases/f99df37a-bfb2-4b7a-b88b-4ccb28ec7ab0/generateAnswer";
+            string subscriptionKey = "c3661bc9434f4ee9ac29af3b5d78993f";
+
+            using (WebClient webClient = new WebClient())
+            {
+                var top = 1;
+                var uri = new Uri(uriString);
+                var body = $"{{ \"question\": \"{question}\", \"top\": \"{top}\" }}";
+
+                webClient.Encoding = System.Text.Encoding.UTF8;
+                webClient.Headers.Add("Ocp-Apim-Subscription-Key", subscriptionKey);
+                webClient.Headers.Add("Content-Type", "application/json");
+                var responseString = webClient.UploadString(uri, body);
+
+                JObject jobj = JObject.Parse(responseString);
+                allAnswers = jobj.SelectToken("answers").ToList();
+            }
+
+            var answers = new List<QnAObject>();
+            for (var i = 0; i < allAnswers.Count; i++)
+            {
+                answers.Add(new QnAObject()
+                {
+                    Answer = allAnswers[i].SelectToken("answer").ToString(),
+                    Score = float.Parse(allAnswers[i].SelectToken("score").ToString())
+                });
+            }
+
+            return answers;
         }
 
 
-        [LuisIntent("None")]
-        private async Task None(IDialogContext context, LuisResult result)
-        {
-            /*TODO: Einstellung keine Freitexteingabe*/
-            await context.PostAsync("Das hab ich leider nicht verstanden :(");
-            await context.PostAsync(HelpText);
-        }
 
 
-        [LuisIntent("CitizenOffice")]
-        private async Task CitizenOffice(IDialogContext context, LuisResult result)
-        {
-            if (result.Entities.Count > 0)
-                context.UserData.SetValue("entity", result.Entities[0].Type.ToLower());
-            context.Call(new CitizenOfficeDialog(), ReturnDialog);
-        }
-
-
-        [LuisIntent("GreenSpaces")]
-        private async Task Greenspaces(IDialogContext context, LuisResult result)
-        {
-            if (result.Entities.Count > 0 )
-                context.UserData.SetValue("entity", result.Entities[0].Type.ToLower());
-            context.Call(new GreenPlacesDialog(), ReturnDialog);
-        }
-
-        [LuisIntent("Disposal")]
-        private async Task Disposal(IDialogContext context, LuisResult result)
-        {
-            if (result.Entities.Count > 0)
-                context.UserData.SetValue("entity", result.Entities[0].Type.ToLower());
-            context.Call(new DisposalDialog(), ReturnDialog);
-        }
     }
 }
